@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShotTrace</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0f;color:#e8e8e8;font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center}
+header{width:100%;padding:14px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid #1e1e2e;background:#0d0d14}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:1.6rem;letter-spacing:.08em;color:#c8f04a}
+.logo span{color:#fff}
+.tab-bar{display:flex;gap:4px;background:#0a0a0f;border:1px solid #1e1e2e;border-radius:8px;padding:4px}
+.tab{font-family:'Inter',sans-serif;font-size:.75rem;font-weight:500;padding:6px 18px;border-radius:6px;border:none;cursor:pointer;background:transparent;color:#555;transition:all .15s;letter-spacing:.03em}
+.tab.active{background:#1a1a2a;color:#c8f04a}
+.status-pill{margin-left:auto;padding:4px 12px;border-radius:999px;font-size:.7rem;font-weight:500;letter-spacing:.06em;text-transform:uppercase;background:#1a1a2a;color:#666;border:1px solid #2a2a3a;transition:all .3s}
+.status-pill.live{background:#0f2a0f;color:#4ade80;border-color:#166534}
+.status-pill.tracing{background:#2a1a00;color:#c8f04a;border-color:#4a3a00}
+.status-pill.recording{background:#2a0a0a;color:#f87171;border-color:#7f1d1d;animation:pulse 1.2s ease-in-out infinite}
+.status-pill.rendering{background:#0f1a2a;color:#60a5fa;border-color:#1e3a6a;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+main{width:100%;max-width:1100px;padding:20px 16px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.page{width:100%;display:none;flex-direction:column;align-items:center;gap:16px}
+.page.active{display:flex}
+.canvas-wrap{position:relative;width:100%;border-radius:8px;overflow:hidden;background:#000;border:1px solid #1e1e2e;cursor:crosshair;aspect-ratio:16/9}
+.placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#333;position:absolute;inset:0}
+.placeholder svg{opacity:.3}
+.placeholder p{font-size:.85rem;color:#444}
+video,canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block;object-fit:contain}
+.controls{width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.ctrl-group{background:#0d0d14;border:1px solid #1e1e2e;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.ctrl-group label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:#555;font-weight:500}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+button{font-family:'Inter',sans-serif;font-size:.78rem;font-weight:500;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-primary{background:#c8f04a;color:#0a0a0f}
+.btn-primary:hover{background:#d8ff5a}
+.btn-primary:disabled{background:#2a2a1a;color:#555;cursor:not-allowed}
+.btn-danger{background:#2a0a0a;color:#f87171;border:1px solid #7f1d1d}
+.btn-danger:hover{background:#3a0a0a}
+.btn-danger:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:#1a1a2a;color:#aaa;border:1px solid #2a2a3a}
+.btn-ghost:hover{background:#222230;color:#ddd}
+.btn-ghost:disabled{opacity:.4;cursor:not-allowed}
+.btn-save{background:#0f2a4a;color:#60a5fa;border:1px solid #1e3a6a}
+.btn-save:hover{background:#1a3a5a}
+.btn-save:disabled{opacity:.4;cursor:not-allowed}
+.btn-render{background:#1a0f2a;color:#c084fc;border:1px solid #4a1a7a}
+.btn-render:hover{background:#2a1a3a}
+.btn-render:disabled{opacity:.4;cursor:not-allowed}
+.swatch-row{display:flex;gap:8px;align-items:center}
+.swatch{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .15s,border-color .15s}
+.swatch:hover{transform:scale(1.15)}
+.swatch.active{border-color:#fff;transform:scale(1.1)}
+.point-counter{font-family:'Bebas Neue',sans-serif;font-size:2rem;color:#c8f04a;line-height:1}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:#1e1e2e;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#c8f04a;cursor:pointer}
+.hint{font-size:.72rem;color:#444;text-align:center;padding-bottom:8px}
+.hint b{color:#666;font-weight:500}
+/* Video upload tab specifics */
+.upload-zone{width:100%;aspect-ratio:16/9;border:2px dashed #2a2a3a;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;cursor:pointer;transition:border-color .2s;background:#0d0d14}
+.upload-zone:hover{border-color:#c8f04a}
+.upload-zone p{font-size:.85rem;color:#444}
+.upload-zone svg{opacity:.3}
+.scrubber-row{display:flex;align-items:center;gap:10px;width:100%}
+.scrubber-row input[type=range]{flex:1}
+.time-label{font-size:.72rem;color:#555;min-width:80px;text-align:right;font-variant-numeric:tabular-nums}
+/* Progress bar for render */
+.progress-bar-wrap{width:100%;height:4px;background:#1e1e2e;border-radius:2px;overflow:hidden;display:none}
+.progress-bar-fill{height:100%;background:#c084fc;border-radius:2px;width:0%;transition:width .1s}
+@media(max-width:680px){.controls{grid-template-columns:1fr 1fr}.ctrl-group:last-child{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Shot<span>Trace</span></div>
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('live')">📷 Live Camera</button>
+    <button class="tab" onclick="switchTab('upload')">🎬 Upload Video</button>
+  </div>
+  <div class="status-pill" id="statusPill">Ready</div>
+</header>
+
+<main>
+
+<!-- ══════════ LIVE CAMERA TAB ══════════ -->
+<div class="page active" id="page-live">
+  <div class="canvas-wrap" id="liveWrap">
+    <div class="placeholder" id="livePlaceholder">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+      <p>Start camera to begin tracing</p>
+    </div>
+    <video id="liveVideo" autoplay muted playsinline style="display:none;object-fit:cover"></video>
+    <canvas id="liveCanvas" style="display:none"></canvas>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>Camera</label>
+      <div class="btn-row">
+        <button class="btn-primary" id="btnCamera">Start Camera</button>
+        <button class="btn-ghost" id="btnFlip" disabled>Flip</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <label>Tracer Color</label>
+      <div class="swatch-row" id="liveSwatches">
+        <div class="swatch active" style="background:#c8f04a" data-color="#c8f04a"></div>
+        <div class="swatch" style="background:#ffffff" data-color="#ffffff"></div>
+        <div class="swatch" style="background:#f97316" data-color="#f97316"></div>
+        <div class="swatch" style="background:#60a5fa" data-color="#60a5fa"></div>
+        <div class="swatch" style="background:#f87171" data-color="#f87171"></div>
+      </div>
+      <label style="margin-top:4px">Line thickness</label>
+      <input type="range" id="liveThickness" min="2" max="12" value="4">
+    </div>
+    <div class="ctrl-group">
+      <label>Points Placed</label>
+      <div class="point-counter" id="livePointCount">0</div>
+      <div class="btn-row">
+        <button class="btn-ghost" id="liveUndo" disabled>Undo</button>
+        <button class="btn-ghost" id="liveClear" disabled>Clear</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <label>Recording</label>
+      <div class="btn-row">
+        <button class="btn-danger" id="btnRecord" disabled>⏺ Record</button>
+        <button class="btn-save" id="btnSave" disabled>⬇ Save</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <label>Animate Trace on Save</label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:2px">
+        <input type="checkbox" id="liveAnimate" checked style="accent-color:#c8f04a;width:14px;height:14px">
+        <span style="font-size:.75rem;color:#aaa">Draw-on animation</span>
+      </label>
+      <p style="font-size:.68rem;color:#444">When on, the tracer animates smoothly across the screen instead of appearing all at once</p>
+    </div>
+    <div class="ctrl-group">
+      <label>How to use</label>
+      <p style="font-size:.7rem;color:#555;line-height:1.7">1. Start camera<br>2. Hit record<br>3. Click the ball as it flies<br>4. Stop → Save</p>
+    </div>
+  </div>
+  <p class="hint"><b>Tip:</b> Place points from tee to landing — the tracer smooths them into a clean arc automatically.</p>
+</div>
+
+<!-- ══════════ UPLOAD VIDEO TAB ══════════ -->
+<div class="page" id="page-upload">
+  <div class="canvas-wrap" id="uploadWrap" style="cursor:default">
+    <div class="placeholder" id="uploadPlaceholder" style="cursor:pointer" onclick="document.getElementById('fileInput').click()">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M10 10l2-2 2 2M12 8v5"/></svg>
+      <p>Tap to upload a video</p>
+      <p style="font-size:.72rem;color:#333">MP4, MOV, WebM supported</p>
+    </div>
+    <video id="uploadVideo" style="display:none;object-fit:contain" preload="metadata"></video>
+    <canvas id="uploadCanvas" style="display:none;cursor:crosshair"></canvas>
+    <input type="file" id="fileInput" accept="video/*" style="display:none">
+  </div>
+
+  <!-- Scrubber -->
+  <div class="scrubber-row" id="scrubberRow" style="display:none">
+    <button class="btn-ghost" id="btnStepBack" style="padding:6px 12px">◀◀</button>
+    <button class="btn-ghost" id="btnPlayPause" style="padding:6px 12px">▶ Play</button>
+    <button class="btn-ghost" id="btnStepFwd" style="padding:6px 12px">▶▶</button>
+    <input type="range" id="scrubber" min="0" max="100" value="0" step="0.01">
+    <span class="time-label" id="timeLabel">0.00s / 0.00s</span>
+  </div>
+
+  <div class="controls" id="uploadControls" style="display:none">
+    <div class="ctrl-group">
+      <label>Tracer Color</label>
+      <div class="swatch-row" id="uploadSwatches">
+        <div class="swatch active" style="background:#c8f04a" data-color="#c8f04a"></div>
+        <div class="swatch" style="background:#ffffff" data-color="#ffffff"></div>
+        <div class="swatch" style="background:#f97316" data-color="#f97316"></div>
+        <div class="swatch" style="background:#60a5fa" data-color="#60a5fa"></div>
+        <div class="swatch" style="background:#f87171" data-color="#f87171"></div>
+      </div>
+      <label style="margin-top:4px">Line thickness</label>
+      <input type="range" id="uploadThickness" min="2" max="12" value="5">
+    </div>
+    <div class="ctrl-group">
+      <label>Points Placed</label>
+      <div class="point-counter" id="uploadPointCount">0</div>
+      <div class="btn-row">
+        <button class="btn-ghost" id="uploadUndo" disabled>Undo</button>
+        <button class="btn-ghost" id="uploadClear" disabled>Clear</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <label>Tracer Style</label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="uploadAnimate" checked style="accent-color:#c8f04a;width:14px;height:14px">
+        <span style="font-size:.75rem;color:#aaa">Animate draw-on</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px">
+        <input type="checkbox" id="uploadGlow" checked style="accent-color:#c8f04a;width:14px;height:14px">
+        <span style="font-size:.75rem;color:#aaa">Glow effect</span>
+      </label>
+    </div>
+    <div class="ctrl-group" style="grid-column:span 2">
+      <label>Export</label>
+      <div class="btn-row">
+        <button class="btn-render" id="btnRender" disabled>✦ Render with Tracer</button>
+        <button class="btn-save" id="btnUploadSave" disabled>⬇ Download</button>
+      </div>
+      <div class="progress-bar-wrap" id="progressWrap">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+      <p style="font-size:.68rem;color:#444" id="renderHint">Place points on the ball's path, then hit Render to export the video with the animated tracer burned in.</p>
+    </div>
+  </div>
+  <p class="hint" id="uploadHint" style="display:none"><b>Tip:</b> Scrub to key frames and click the ball's position to plot the path. Points don't have to be placed in real time.</p>
+</div>
+
+</main>
+
+<script>
+// ─── TAB SWITCHING ───────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  event.target.classList.add('active');
+  statusPill.textContent = 'Ready';
+  statusPill.className = 'status-pill';
+}
+
+const statusPill = document.getElementById('statusPill');
+
+// ─── SHARED: smooth catmull-rom spline ──────────────────────────
+function catmullRomPath(ctx, pts) {
+  if (pts.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  if (pts.length === 2) { ctx.lineTo(pts[1].x, pts[1].y); return; }
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(i-1,0)];
+    const p1 = pts[i];
+    const p2 = pts[i+1];
+    const p3 = pts[Math.min(i+2,pts.length-1)];
+    ctx.bezierCurveTo(
+      p1.x+(p2.x-p0.x)/6, p1.y+(p2.y-p0.y)/6,
+      p2.x-(p3.x-p1.x)/6, p2.y-(p3.y-p1.y)/6,
+      p2.x, p2.y
+    );
+  }
+}
+
+// Get interpolated point along the spline at t=[0,1]
+function getSplinePoint(pts, t) {
+  if (pts.length < 2) return pts[0];
+  const segments = pts.length - 1;
+  const seg = Math.min(Math.floor(t * segments), segments - 1);
+  const localT = (t * segments) - seg;
+  const p0 = pts[Math.max(seg-1,0)];
+  const p1 = pts[seg];
+  const p2 = pts[Math.min(seg+1,pts.length-1)];
+  const p3 = pts[Math.min(seg+2,pts.length-1)];
+  const cp1x = p1.x+(p2.x-p0.x)/6, cp1y = p1.y+(p2.y-p0.y)/6;
+  const cp2x = p2.x-(p3.x-p1.x)/6, cp2y = p2.y-(p3.y-p1.y)/6;
+  const mt = 1 - localT;
+  return {
+    x: mt*mt*mt*p1.x + 3*mt*mt*localT*cp1x + 3*mt*localT*localT*cp2x + localT*localT*localT*p2.x,
+    y: mt*mt*mt*p1.y + 3*mt*mt*localT*cp1y + 3*mt*localT*localT*cp2y + localT*localT*localT*p2.y
+  };
+}
+
+// Draw tracer up to progress [0,1], with optional glow
+function drawTracerPartial(ctx, pts, color, thickness, progress, glow) {
+  if (pts.length < 2) return;
+  const steps = 200;
+  const end = Math.floor(progress * steps);
+  const partial = [];
+  for (let i = 0; i <= end; i++) {
+    partial.push(getSplinePoint(pts, i / steps));
+  }
+  if (partial.length < 2) return;
+
+  if (glow) {
+    ctx.save();
+    ctx.shadowBlur = 20; ctx.shadowColor = color;
+    ctx.strokeStyle = color; ctx.lineWidth = thickness + 2;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath(); ctx.moveTo(partial[0].x, partial[0].y);
+    partial.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.stroke(); ctx.restore();
+  }
+
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = thickness;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = 0.95;
+  ctx.beginPath(); ctx.moveTo(partial[0].x, partial[0].y);
+  partial.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.stroke();
+
+  // Ball dot at tip
+  if (partial.length > 0) {
+    const tip = partial[partial.length-1];
+    ctx.beginPath(); ctx.arc(tip.x, tip.y, thickness+2, 0, Math.PI*2);
+    ctx.fillStyle = color; ctx.shadowBlur = 12; ctx.shadowColor = color;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// LIVE CAMERA
+// ─────────────────────────────────────────────────────────────────
+const liveVideo = document.getElementById('liveVideo');
+const liveCanvas = document.getElementById('liveCanvas');
+const liveCtx = liveCanvas.getContext('2d');
+const liveWrap = document.getElementById('liveWrap');
+const livePlaceholder = document.getElementById('livePlaceholder');
+const btnCamera = document.getElementById('btnCamera');
+const btnFlip = document.getElementById('btnFlip');
+const btnRecord = document.getElementById('btnRecord');
+const btnSave = document.getElementById('btnSave');
+const livePointCountEl = document.getElementById('livePointCount');
+const liveThickness = document.getElementById('liveThickness');
+const liveAnimate = document.getElementById('liveAnimate');
+
+let liveStream = null, facingMode = 'environment';
+let livePoints = [], liveColor = '#c8f04a', liveLine = 4;
+let mediaRecorder = null, recordedChunks = [], isRecording = false;
+let cameraActive = false, liveAnimFrame = null;
+let liveAnimProgress = 0, liveAnimating = false, liveAnimRaf = null;
+
+function resizeLiveCanvas() {
+  const r = liveWrap.getBoundingClientRect();
+  liveCanvas.width = r.width; liveCanvas.height = r.height;
+}
+
+function liveRenderLoop() {
+  if (!cameraActive) return;
+  liveCtx.clearRect(0,0,liveCanvas.width,liveCanvas.height);
+  liveCtx.drawImage(liveVideo,0,0,liveCanvas.width,liveCanvas.height);
+  if (livePoints.length >= 2) {
+    drawTracerPartial(liveCtx, livePoints, liveColor, liveLine, 1, true);
+  } else if (livePoints.length === 1) {
+    liveCtx.save();
+    liveCtx.beginPath();
+    liveCtx.arc(livePoints[0].x, livePoints[0].y, liveLine+2, 0, Math.PI*2);
+    liveCtx.fillStyle = liveColor; liveCtx.fill(); liveCtx.restore();
+  }
+  liveAnimFrame = requestAnimationFrame(liveRenderLoop);
+}
+
+btnCamera.addEventListener('click', async () => {
+  if (cameraActive) { stopLiveCamera(); return; }
+  try {
+    liveStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width:{ideal:1920}, height:{ideal:1080} }, audio:false
+    });
+    liveVideo.srcObject = liveStream;
+    liveVideo.style.display = 'block';
+    liveCanvas.style.display = 'block';
+    livePlaceholder.style.display = 'none';
+    liveVideo.onloadedmetadata = () => {
+      liveWrap.style.aspectRatio = `${liveVideo.videoWidth}/${liveVideo.videoHeight}`;
+      resizeLiveCanvas();
+      cameraActive = true;
+      liveRenderLoop();
+      statusPill.textContent = 'Live'; statusPill.className = 'status-pill live';
+      btnCamera.textContent = 'Stop Camera'; btnCamera.className = 'btn-ghost';
+      btnFlip.disabled = false; btnRecord.disabled = false;
+    };
+  } catch(e) { alert('Camera access denied. Please allow camera permissions.'); }
+});
+
+function stopLiveCamera() {
+  if (liveStream) liveStream.getTracks().forEach(t=>t.stop());
+  if (liveAnimFrame) cancelAnimationFrame(liveAnimFrame);
+  cameraActive = false;
+  liveVideo.style.display = 'none'; liveCanvas.style.display = 'none';
+  livePlaceholder.style.display = 'flex';
+  statusPill.textContent = 'Ready'; statusPill.className = 'status-pill';
+  btnCamera.textContent = 'Start Camera'; btnCamera.className = 'btn-primary';
+  btnFlip.disabled = true; btnRecord.disabled = true;
+  if (isRecording) stopRecording();
+}
+
+btnFlip.addEventListener('click', () => {
+  facingMode = facingMode==='environment'?'user':'environment';
+  stopLiveCamera(); setTimeout(()=>btnCamera.click(),200);
+});
+
+liveWrap.addEventListener('click', e => {
+  if (!cameraActive) return;
+  const r = liveCanvas.getBoundingClientRect();
+  const sx = liveCanvas.width/r.width, sy = liveCanvas.height/r.height;
+  livePoints.push({x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy});
+  updateLiveUI();
+});
+
+function updateLiveUI() {
+  livePointCountEl.textContent = livePoints.length;
+  document.getElementById('liveUndo').disabled = livePoints.length===0;
+  document.getElementById('liveClear').disabled = livePoints.length===0;
+  statusPill.textContent = livePoints.length>0?'Tracing':'Live';
+  statusPill.className = livePoints.length>0?'status-pill tracing':'status-pill live';
+}
+
+document.getElementById('liveUndo').addEventListener('click',()=>{livePoints.pop();updateLiveUI()});
+document.getElementById('liveClear').addEventListener('click',()=>{livePoints=[];updateLiveUI()});
+liveThickness.addEventListener('input',()=>liveLine=+liveThickness.value);
+document.querySelectorAll('#liveSwatches .swatch').forEach(s=>{
+  s.addEventListener('click',()=>{
+    document.querySelectorAll('#liveSwatches .swatch').forEach(x=>x.classList.remove('active'));
+    s.classList.add('active'); liveColor=s.dataset.color;
+  });
+});
+
+// Recording
+btnRecord.addEventListener('click',()=>isRecording?stopRecording():startRecording());
+
+function startRecording() {
+  recordedChunks=[];
+  const cs = liveCanvas.captureStream(30);
+  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':
+               MediaRecorder.isTypeSupported('video/webm')?'video/webm':'video/mp4';
+  try { mediaRecorder = new MediaRecorder(cs,{mimeType:mime}); }
+  catch(e){ mediaRecorder = new MediaRecorder(cs); }
+  mediaRecorder.ondataavailable = e=>{if(e.data.size>0)recordedChunks.push(e.data)};
+  mediaRecorder.onstop = ()=>btnSave.disabled=false;
+  mediaRecorder.start(100);
+  isRecording=true;
+  btnRecord.textContent='⏹ Stop'; btnRecord.className='btn-ghost';
+  statusPill.textContent='● Recording'; statusPill.className='status-pill recording';
+}
+
+function stopRecording() {
+  if (mediaRecorder&&mediaRecorder.state!=='inactive') mediaRecorder.stop();
+  isRecording=false;
+  btnRecord.textContent='⏺ Record'; btnRecord.className='btn-danger';
+  statusPill.textContent=livePoints.length>0?'Tracing':'Live';
+  statusPill.className=livePoints.length>0?'status-pill tracing':'status-pill live';
+}
+
+btnSave.addEventListener('click',()=>{
+  if (recordedChunks.length===0) return;
+  // If animate is on, we need to re-render with smooth animation
+  if (liveAnimate.checked && livePoints.length>=2) {
+    renderAnimatedLiveExport();
+  } else {
+    downloadBlob(new Blob(recordedChunks,{type:recordedChunks[0].type||'video/webm'}));
+  }
+});
+
+function renderAnimatedLiveExport() {
+  // Create a secondary canvas, replay recorded video, draw animated tracer on top
+  // Since we can't re-read the recorded blob as live frames easily,
+  // we instead create an offline canvas animation of just the tracer over a frozen frame
+  // and offer it as a separate download alongside the raw video
+  statusPill.textContent='Rendering'; statusPill.className='status-pill rendering';
+  btnSave.disabled=true;
+
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = liveCanvas.width; offCanvas.height = liveCanvas.height;
+  const offCtx = offCanvas.getContext('2d');
+
+  // Freeze current frame
+  offCtx.drawImage(liveVideo,0,0,offCanvas.width,offCanvas.height);
+  const frozenFrame = new ImageData(
+    offCtx.getImageData(0,0,offCanvas.width,offCanvas.height).data,
+    offCanvas.width, offCanvas.height
+  );
+
+  const stream = offCanvas.captureStream(60);
+  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+  const mr = new MediaRecorder(stream,{mimeType:mime});
+  const chunks=[];
+  mr.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data)};
+  mr.onstop=()=>{
+    downloadBlob(new Blob(chunks,{type:chunks[0].type||'video/webm'}),'shot-trace-animated');
+    statusPill.textContent='Live'; statusPill.className='status-pill live';
+    btnSave.disabled=false;
+  };
+  mr.start();
+
+  let prog=0;
+  const duration=2000; // 2s draw-on animation
+  const startTime=performance.now();
+
+  function frame(now) {
+    prog = Math.min((now-startTime)/duration,1);
+    offCtx.putImageData(frozenFrame,0,0);
+    drawTracerPartial(offCtx,livePoints,liveColor,liveLine,prog,true);
+    if (prog<1) requestAnimationFrame(frame);
+    else { setTimeout(()=>mr.stop(),300); }
+  }
+  requestAnimationFrame(frame);
+}
+
+function downloadBlob(blob,name='shot-trace') {
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`${name}-${Date.now()}.webm`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+window.addEventListener('resize',resizeLiveCanvas);
+
+// ─────────────────────────────────────────────────────────────────
+// UPLOAD VIDEO TAB
+// ─────────────────────────────────────────────────────────────────
+const fileInput = document.getElementById('fileInput');
+const uploadVideo = document.getElementById('uploadVideo');
+const uploadCanvas = document.getElementById('uploadCanvas');
+const upCtx = uploadCanvas.getContext('2d');
+const uploadWrap = document.getElementById('uploadWrap');
+const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+const scrubberRow = document.getElementById('scrubberRow');
+const uploadControls = document.getElementById('uploadControls');
+const scrubber = document.getElementById('scrubber');
+const timeLabel = document.getElementById('timeLabel');
+const btnStepBack = document.getElementById('btnStepBack');
+const btnStepFwd = document.getElementById('btnStepFwd');
+const btnPlayPause = document.getElementById('btnPlayPause');
+const btnRender = document.getElementById('btnRender');
+const btnUploadSave = document.getElementById('btnUploadSave');
+const progressWrap = document.getElementById('progressWrap');
+const progressFill = document.getElementById('progressFill');
+const renderHint = document.getElementById('renderHint');
+const uploadPointCountEl = document.getElementById('uploadPointCount');
+const uploadThickness = document.getElementById('uploadThickness');
+
+let upPoints=[], upColor='#c8f04a', upLine=5;
+let upAnimFrame=null, upLoaded=false, upRenderedChunks=[];
+let upVideoPlaying=false;
+
+fileInput.addEventListener('change', e=>{
+  const file=e.target.files[0]; if(!file)return;
+  const url=URL.createObjectURL(file);
+  uploadVideo.src=url;
+  uploadVideo.style.display='block';
+  uploadCanvas.style.display='block';
+  uploadPlaceholder.style.display='none';
+  scrubberRow.style.display='flex';
+  uploadControls.style.display='grid';
+  document.getElementById('uploadHint').style.display='block';
+  uploadVideo.onloadedmetadata=()=>{
+    uploadWrap.style.aspectRatio=`${uploadVideo.videoWidth}/${uploadVideo.videoHeight}`;
+    resizeUpCanvas();
+    scrubber.max=uploadVideo.duration;
+    scrubber.step=0.033;
+    updateTimeLabel();
+    upLoaded=true;
+    uploadVideo.currentTime=0;
+    statusPill.textContent='Video Loaded'; statusPill.className='status-pill live';
+    upRenderLoop();
+  };
+});
+
+// drag & drop
+uploadWrap.addEventListener('dragover',e=>{e.preventDefault();uploadPlaceholder.style.borderColor='#c8f04a'});
+uploadWrap.addEventListener('dragleave',()=>{uploadPlaceholder.style.borderColor=''});
+uploadWrap.addEventListener('drop',e=>{
+  e.preventDefault();
+  const file=e.dataTransfer.files[0];
+  if(file&&file.type.startsWith('video/')){fileInput.files=e.dataTransfer.files;fileInput.dispatchEvent(new Event('change'))}
+});
+
+function resizeUpCanvas(){
+  const r=uploadWrap.getBoundingClientRect();
+  uploadCanvas.width=r.width; uploadCanvas.height=r.height;
+}
+
+function upRenderLoop(){
+  if(!upLoaded)return;
+  upCtx.clearRect(0,0,uploadCanvas.width,uploadCanvas.height);
+  upCtx.drawImage(uploadVideo,0,0,uploadCanvas.width,uploadCanvas.height);
+  if(upPoints.length>=2) drawTracerPartial(upCtx,upPoints,upColor,upLine,1,document.getElementById('uploadGlow').checked);
+  else if(upPoints.length===1){
+    upCtx.save();upCtx.beginPath();
+    upCtx.arc(upPoints[0].x,upPoints[0].y,upLine+2,0,Math.PI*2);
+    upCtx.fillStyle=upColor;upCtx.shadowBlur=10;upCtx.shadowColor=upColor;
+    upCtx.fill();upCtx.restore();
+  }
+  if(!upVideoPlaying) updateTimeLabel();
+  upAnimFrame=requestAnimationFrame(upRenderLoop);
+}
+
+// Click to place point on upload canvas
+uploadCanvas.addEventListener('click',e=>{
+  if(!upLoaded)return;
+  const r=uploadCanvas.getBoundingClientRect();
+  const sx=uploadCanvas.width/r.width, sy=uploadCanvas.height/r.height;
+  upPoints.push({x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy});
+  updateUpUI();
+});
+
+function updateUpUI(){
+  uploadPointCountEl.textContent=upPoints.length;
+  document.getElementById('uploadUndo').disabled=upPoints.length===0;
+  document.getElementById('uploadClear').disabled=upPoints.length===0;
+  btnRender.disabled=upPoints.length<2;
+  statusPill.textContent=upPoints.length>0?'Tracing':'Video Loaded';
+  statusPill.className=upPoints.length>0?'status-pill tracing':'status-pill live';
+}
+
+document.getElementById('uploadUndo').addEventListener('click',()=>{upPoints.pop();updateUpUI()});
+document.getElementById('uploadClear').addEventListener('click',()=>{upPoints=[];updateUpUI()});
+uploadThickness.addEventListener('input',()=>upLine=+uploadThickness.value);
+document.querySelectorAll('#uploadSwatches .swatch').forEach(s=>{
+  s.addEventListener('click',()=>{
+    document.querySelectorAll('#uploadSwatches .swatch').forEach(x=>x.classList.remove('active'));
+    s.classList.add('active'); upColor=s.dataset.color;
+  });
+});
+
+// Scrubber
+scrubber.addEventListener('input',()=>{
+  uploadVideo.currentTime=+scrubber.value; updateTimeLabel();
+});
+uploadVideo.addEventListener('timeupdate',()=>{
+  scrubber.value=uploadVideo.currentTime; updateTimeLabel();
+});
+uploadVideo.addEventListener('ended',()=>{upVideoPlaying=false;btnPlayPause.textContent='▶ Play'});
+
+function updateTimeLabel(){
+  const fmt=t=>{const m=Math.floor(t/60),s=(t%60).toFixed(2).padStart(5,'0');return`${m}:${s}`};
+  timeLabel.textContent=`${fmt(uploadVideo.currentTime)} / ${fmt(uploadVideo.duration||0)}`;
+}
+
+btnPlayPause.addEventListener('click',()=>{
+  if(upVideoPlaying){uploadVideo.pause();btnPlayPause.textContent='▶ Play';upVideoPlaying=false;}
+  else{uploadVideo.play();btnPlayPause.textContent='⏸ Pause';upVideoPlaying=true;}
+});
+btnStepBack.addEventListener('click',()=>{uploadVideo.currentTime=Math.max(0,uploadVideo.currentTime-1/30)});
+btnStepFwd.addEventListener('click',()=>{uploadVideo.currentTime=Math.min(uploadVideo.duration,uploadVideo.currentTime+1/30)});
+
+// ── RENDER WITH TRACER ──────────────────────────────────────────
+btnRender.addEventListener('click', async ()=>{
+  if(upPoints.length<2)return;
+  btnRender.disabled=true;
+  btnUploadSave.disabled=true;
+  upRenderedChunks=[];
+  progressWrap.style.display='block';
+  progressFill.style.width='0%';
+  renderHint.textContent='Rendering… this may take a moment.';
+  statusPill.textContent='Rendering'; statusPill.className='status-pill rendering';
+
+  const offCanvas=document.createElement('canvas');
+  offCanvas.width=uploadCanvas.width; offCanvas.height=uploadCanvas.height;
+  const offCtx=offCanvas.getContext('2d');
+
+  const totalDur=uploadVideo.duration;
+  const animDur=Math.min(2.5,totalDur*0.6); // tracer draws on over this many seconds
+  const fps=30;
+  const totalFrames=Math.ceil(totalDur*fps);
+  const animStartFrame=Math.floor((totalDur-animDur)*fps*0.3); // starts 30% in
+
+  const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+  const stream=offCanvas.captureStream(fps);
+  const mr=new MediaRecorder(stream,{mimeType:mime});
+  mr.ondataavailable=e=>{if(e.data.size>0)upRenderedChunks.push(e.data)};
+  mr.onstop=()=>{
+    btnUploadSave.disabled=false;
+    btnRender.disabled=false;
+    progressFill.style.width='100%';
+    renderHint.textContent='Done! Hit Download to save your video.';
+    statusPill.textContent='Done'; statusPill.className='status-pill live';
+  };
+
+  uploadVideo.pause();
+  uploadVideo.currentTime=0;
+  mr.start();
+
+  const doGlow=document.getElementById('uploadGlow').checked;
+  const doAnim=document.getElementById('uploadAnimate').checked;
+
+  let frame=0;
+  function renderFrame(){
+    if(frame>=totalFrames){mr.stop();return;}
+    const t=frame/fps;
+    uploadVideo.currentTime=t;
+
+    setTimeout(()=>{
+      offCtx.clearRect(0,0,offCanvas.width,offCanvas.height);
+      offCtx.drawImage(uploadVideo,0,0,offCanvas.width,offCanvas.height);
+
+      if(upPoints.length>=2){
+        let prog=1;
+        if(doAnim){
+          const animEndFrame=animStartFrame+Math.ceil(animDur*fps);
+          if(frame<animStartFrame) prog=0;
+          else if(frame>=animEndFrame) prog=1;
+          else prog=(frame-animStartFrame)/(animEndFrame-animStartFrame);
+          // ease in-out
+          prog=prog<0.5?2*prog*prog:1-Math.pow(-2*prog+2,2)/2;
+        }
+        drawTracerPartial(offCtx,upPoints,upColor,upLine,prog,doGlow);
+      }
+
+      progressFill.style.width=`${(frame/totalFrames*100).toFixed(1)}%`;
+      frame++;
+      requestAnimationFrame(renderFrame);
+    }, 1000/fps);
+  }
+  renderFrame();
+});
+
+btnUploadSave.addEventListener('click',()=>{
+  if(!upRenderedChunks.length)return;
+  downloadBlob(new Blob(upRenderedChunks,{type:upRenderedChunks[0].type||'video/webm'}),'shot-trace-video');
+});
+
+window.addEventListener('resize',resizeUpCanvas);
+</script>
+</body>
+</html>
