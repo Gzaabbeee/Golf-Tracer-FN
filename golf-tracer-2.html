@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShotTrace</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Bebas+Neue&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#0b0c0f;color:#e0e0e0;font-family:'Inter',sans-serif;display:flex;flex-direction:column;align-items:center}
+
+/* ── HEADER ── */
+header{width:100%;padding:12px 20px;display:flex;align-items:center;gap:14px;background:#0e0f14;border-bottom:1px solid #1c1e28}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.1em;color:#fff}
+.logo em{color:#7cf542;font-style:normal}
+.tabs{display:flex;gap:2px;background:#13151c;border:1px solid #1c1e28;border-radius:7px;padding:3px}
+.tab-btn{font-size:.72rem;font-weight:600;letter-spacing:.04em;padding:5px 16px;border-radius:5px;border:none;cursor:pointer;background:transparent;color:#555;transition:all .15s;text-transform:uppercase}
+.tab-btn.on{background:#1d202e;color:#c8f04a}
+.badge{margin-left:auto;display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:#333}
+.dot.green{background:#4ade80;box-shadow:0 0 6px #4ade80}
+.dot.yellow{background:#c8f04a;box-shadow:0 0 6px #c8f04a;animation:blink 1s ease-in-out infinite}
+.dot.red{background:#f87171;box-shadow:0 0 6px #f87171;animation:blink .8s ease-in-out infinite}
+.dot.blue{background:#60a5fa;box-shadow:0 0 6px #60a5fa;animation:blink 1s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.badge-label{font-size:.68rem;font-weight:500;color:#555;text-transform:uppercase;letter-spacing:.06em}
+
+/* ── LAYOUT ── */
+main{width:100%;max-width:1080px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.page{display:none;flex-direction:column;gap:14px}
+.page.on{display:flex}
+
+/* ── CANVAS AREA ── */
+.stage{position:relative;width:100%;background:#000;border-radius:10px;overflow:hidden;border:1px solid #1c1e28}
+.stage-inner{position:relative;width:100%;aspect-ratio:16/9}
+.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%}
+.stage video{object-fit:cover}
+.stage canvas{object-fit:contain}
+.empty-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer}
+.empty-state svg{opacity:.15}
+.empty-state p{font-size:.8rem;color:#333;font-weight:500}
+.empty-state small{font-size:.68rem;color:#252525}
+
+/* ── TOOLBAR (live) ── */
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn{font-family:'Inter',sans-serif;font-size:.73rem;font-weight:600;padding:7px 15px;border-radius:6px;border:none;cursor:pointer;transition:background .12s,opacity .12s;letter-spacing:.02em;white-space:nowrap}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-lime{background:#c8f04a;color:#0a0c08}
+.btn-lime:hover:not(:disabled){background:#d6ff55}
+.btn-outline{background:transparent;color:#888;border:1px solid #252830}
+.btn-outline:hover:not(:disabled){background:#1a1c25;color:#ccc}
+.btn-outline.on{border-color:#c8f04a;color:#c8f04a}
+.btn-red{background:#1e0a0a;color:#f87171;border:1px solid #4a1515}
+.btn-red:hover:not(:disabled){background:#2a0f0f}
+.btn-blue{background:#0a1525;color:#60a5fa;border:1px solid #153050}
+.btn-blue:hover:not(:disabled){background:#0f1e35}
+.btn-purple{background:#150a25;color:#c084fc;border:1px solid #3a1560}
+.btn-purple:hover:not(:disabled){background:#1e1030}
+.sep{width:1px;height:20px;background:#1c1e28}
+
+/* ── COLOR PICKER ── */
+.colors{display:flex;gap:6px;align-items:center}
+.col{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:transform .12s,border-color .12s}
+.col:hover{transform:scale(1.2)}
+.col.on{border-color:#fff;transform:scale(1.15)}
+
+/* ── DRAW MODE HINT ── */
+.mode-hint{font-size:.68rem;color:#3a3d4a;text-align:center;padding:2px 0 4px}
+
+/* ── SCRUBBER (upload) ── */
+.scrub-row{display:flex;align-items:center;gap:8px}
+.scrub-row input[type=range]{flex:1;-webkit-appearance:none;height:3px;border-radius:2px;background:#1c1e28;outline:none}
+.scrub-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#c8f04a;cursor:pointer}
+.time{font-size:.68rem;color:#444;min-width:90px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* ── PANELS ── */
+.panels{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.panel{background:#0e0f14;border:1px solid #1c1e28;border-radius:8px;padding:13px 14px;display:flex;flex-direction:column;gap:9px}
+.panel-title{font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;color:#3a3d4a;font-weight:600}
+.slider-wrap{display:flex;flex-direction:column;gap:4px}
+.slider-wrap input[type=range]{-webkit-appearance:none;height:3px;border-radius:2px;background:#1c1e28;outline:none}
+.slider-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#c8f04a;cursor:pointer}
+.counter{font-family:'Bebas Neue',sans-serif;font-size:2.2rem;color:#c8f04a;line-height:1}
+.tip{font-size:.67rem;color:#2e3040;line-height:1.6}
+
+/* ── PROGRESS ── */
+.prog-wrap{height:3px;background:#1c1e28;border-radius:2px;overflow:hidden;display:none}
+.prog-fill{height:100%;background:linear-gradient(90deg,#7c3aed,#c084fc);border-radius:2px;width:0%;transition:width .08s}
+
+/* ── AUTO DETECT overlay ── */
+.detect-msg{font-size:.72rem;color:#555;margin-top:2px}
+
+@media(max-width:660px){.panels{grid-template-columns:1fr 1fr}.panel:last-child{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Shot<em>Trace</em></div>
+  <div class="tabs">
+    <button class="tab-btn on" onclick="goTab('live',this)">📷 Live</button>
+    <button class="tab-btn" onclick="goTab('upload',this)">🎬 Upload</button>
+  </div>
+  <div class="badge">
+    <div class="dot" id="dot"></div>
+    <span class="badge-label" id="badgeLabel">Idle</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ══════════ LIVE TAB ══════════ -->
+<div class="page on" id="page-live">
+  <div class="stage">
+    <div class="stage-inner" id="liveStage">
+      <div class="empty-state" id="liveEmpty">
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <p>Start camera to trace</p>
+        <small>Stand behind the golfer, camera looking down the fairway</small>
+      </div>
+      <video id="liveVid" autoplay muted playsinline style="display:none"></video>
+      <canvas id="liveCanvas" style="display:none"></canvas>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn btn-lime" id="btnCam">Start Camera</button>
+    <button class="btn btn-outline" id="btnFlip" disabled>Flip</button>
+    <div class="sep"></div>
+    <!-- Draw mode toggle -->
+    <button class="btn btn-outline on" id="btnDraw" title="Draw freehand path">✏ Draw</button>
+    <button class="btn btn-outline" id="btnClick" title="Click points mode">· Points</button>
+    <div class="sep"></div>
+    <button class="btn btn-outline" id="liveUndo" disabled>Undo</button>
+    <button class="btn btn-outline" id="liveClear" disabled>Clear</button>
+    <div class="sep"></div>
+    <div class="colors" id="liveCols">
+      <div class="col on" style="background:#c8f04a" data-c="#c8f04a"></div>
+      <div class="col" style="background:#fff" data-c="#ffffff"></div>
+      <div class="col" style="background:#f97316" data-c="#f97316"></div>
+      <div class="col" style="background:#38bdf8" data-c="#38bdf8"></div>
+      <div class="col" style="background:#f87171" data-c="#f87171"></div>
+    </div>
+    <div class="sep"></div>
+    <button class="btn btn-red" id="btnRec" disabled>⏺ Rec</button>
+    <button class="btn btn-blue" id="btnSaveLive" disabled>⬇ Save</button>
+  </div>
+
+  <div class="mode-hint" id="modeHint">✏ Draw mode — click and drag on the canvas to draw the ball's path</div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Line Style</div>
+      <div class="slider-wrap">
+        <span style="font-size:.65rem;color:#444">Thickness</span>
+        <input type="range" id="liveThick" min="2" max="14" value="5">
+      </div>
+      <div class="slider-wrap">
+        <span style="font-size:.65rem;color:#444">Glow intensity</span>
+        <input type="range" id="liveGlow" min="0" max="40" value="18">
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Points / Strokes</div>
+      <div class="counter" id="livePtCount">0</div>
+      <div class="tip">Draw freely or click to place points. Undo removes the last stroke.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">How to use</div>
+      <div class="tip">1. Start camera<br>2. Hit record<br>3. Draw or click the ball's path as it flies<br>4. Stop → Save</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ UPLOAD TAB ══════════ -->
+<div class="page" id="page-upload">
+  <div class="stage">
+    <div class="stage-inner" id="upStage">
+      <div class="empty-state" id="upEmpty" onclick="document.getElementById('fileIn').click()">
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M9 10l3-3 3 3M12 7v6"/></svg>
+        <p>Tap to upload a video</p>
+        <small>MP4, MOV, WebM — camera-behind-golfer angle works best</small>
+      </div>
+      <video id="upVid" style="display:none;object-fit:contain" preload="metadata"></video>
+      <canvas id="upCanvas" style="display:none"></canvas>
+      <input type="file" id="fileIn" accept="video/*" style="display:none">
+    </div>
+  </div>
+
+  <!-- Scrubber -->
+  <div class="scrub-row" id="scrubRow" style="display:none">
+    <button class="btn btn-outline" id="btnBack" style="padding:5px 10px">◀</button>
+    <button class="btn btn-outline" id="btnPP" style="padding:5px 12px">▶</button>
+    <button class="btn btn-outline" id="btnFwd" style="padding:5px 10px">▶</button>
+    <input type="range" id="scrub" min="0" max="100" value="0" step="0.033">
+    <span class="time" id="timeLbl">0:00.0 / 0:00.0</span>
+  </div>
+
+  <div class="toolbar" id="upToolbar" style="display:none">
+    <button class="btn btn-outline on" id="upBtnDraw">✏ Draw</button>
+    <button class="btn btn-outline" id="upBtnClick">· Points</button>
+    <div class="sep"></div>
+    <button class="btn btn-outline" id="upUndo" disabled>Undo</button>
+    <button class="btn btn-outline" id="upClear" disabled>Clear</button>
+    <div class="sep"></div>
+    <div class="colors" id="upCols">
+      <div class="col on" style="background:#c8f04a" data-c="#c8f04a"></div>
+      <div class="col" style="background:#fff" data-c="#ffffff"></div>
+      <div class="col" style="background:#f97316" data-c="#f97316"></div>
+      <div class="col" style="background:#38bdf8" data-c="#38bdf8"></div>
+      <div class="col" style="background:#f87171" data-c="#f87171"></div>
+    </div>
+    <div class="sep"></div>
+    <button class="btn btn-purple" id="btnAutoDetect" disabled>⚡ Auto-Detect Path</button>
+    <button class="btn btn-purple" id="btnRender" disabled>✦ Render</button>
+    <button class="btn btn-blue" id="btnUpSave" disabled>⬇ Save</button>
+  </div>
+
+  <div class="prog-wrap" id="progWrap"><div class="prog-fill" id="progFill"></div></div>
+  <div class="detect-msg" id="detectMsg"></div>
+
+  <div class="panels" id="upPanels" style="display:none">
+    <div class="panel">
+      <div class="panel-title">Line Style</div>
+      <div class="slider-wrap">
+        <span style="font-size:.65rem;color:#444">Thickness</span>
+        <input type="range" id="upThick" min="2" max="14" value="5">
+      </div>
+      <div class="slider-wrap">
+        <span style="font-size:.65rem;color:#444">Glow</span>
+        <input type="range" id="upGlow" min="0" max="40" value="18">
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Points / Strokes</div>
+      <div class="counter" id="upPtCount">0</div>
+      <div class="tip">Draw on the canvas or use Auto-Detect to find the ball's rough path automatically.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Export Options</div>
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer">
+        <input type="checkbox" id="chkAnim" checked style="accent-color:#c8f04a">
+        <span style="font-size:.72rem;color:#aaa">Animate tracer draw-on</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer">
+        <input type="checkbox" id="chkGlow" checked style="accent-color:#c8f04a">
+        <span style="font-size:.72rem;color:#aaa">Glow effect</span>
+      </label>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ── UTILS ────────────────────────────────────────────────────────
+const $=id=>document.getElementById(id);
+const dot=$('dot'), badgeLbl=$('badgeLabel');
+function setStatus(s,label){
+  dot.className='dot'+(s?' '+s:'');
+  badgeLbl.textContent=label;
+}
+
+function goTab(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('on'));
+  $('page-'+id).classList.add('on');
+  btn.classList.add('on');
+  setStatus('','Idle');
+}
+
+// ── SPLINE / DRAWING UTILS ───────────────────────────────────────
+// Simplify a polyline (Ramer-Douglas-Peucker)
+function rdp(pts, eps) {
+  if (pts.length < 3) return pts;
+  let maxD = 0, idx = 0;
+  const end = pts.length - 1;
+  const [ax,ay] = [pts[0].x, pts[0].y];
+  const [bx,by] = [pts[end].x, pts[end].y];
+  const len = Math.hypot(bx-ax, by-ay);
+  for (let i = 1; i < end; i++) {
+    const d = len===0 ? Math.hypot(pts[i].x-ax, pts[i].y-ay)
+      : Math.abs((by-ay)*pts[i].x-(bx-ax)*pts[i].y+bx*ay-by*ax)/len;
+    if (d > maxD) { maxD=d; idx=i; }
+  }
+  if (maxD > eps) {
+    const l = rdp(pts.slice(0,idx+1), eps);
+    const r = rdp(pts.slice(idx), eps);
+    return [...l.slice(0,-1), ...r];
+  }
+  return [pts[0], pts[end]];
+}
+
+// Catmull-Rom path builder (returns path2D-like segment list)
+function buildSpline(ctx, pts) {
+  if (pts.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  if (pts.length === 2) { ctx.lineTo(pts[1].x, pts[1].y); return; }
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(i-1,0)];
+    const p1 = pts[i], p2 = pts[i+1];
+    const p3 = pts[Math.min(i+2,pts.length-1)];
+    ctx.bezierCurveTo(
+      p1.x+(p2.x-p0.x)/6, p1.y+(p2.y-p0.y)/6,
+      p2.x-(p3.x-p1.x)/6, p2.y-(p3.y-p1.y)/6,
+      p2.x, p2.y
+    );
+  }
+}
+
+// Sample a spline at t=[0,1]
+function sampleSpline(pts, t) {
+  if (pts.length < 2) return pts[0];
+  const segs = pts.length - 1;
+  const s = Math.min(Math.floor(t*segs), segs-1);
+  const lt = t*segs - s;
+  const p0=pts[Math.max(s-1,0)], p1=pts[s], p2=pts[Math.min(s+1,pts.length-1)], p3=pts[Math.min(s+2,pts.length-1)];
+  const cp1x=p1.x+(p2.x-p0.x)/6, cp1y=p1.y+(p2.y-p0.y)/6;
+  const cp2x=p2.x-(p3.x-p1.x)/6, cp2y=p2.y-(p3.y-p1.y)/6;
+  const m=1-lt;
+  return {
+    x: m*m*m*p1.x + 3*m*m*lt*cp1x + 3*m*lt*lt*cp2x + lt*lt*lt*p2.x,
+    y: m*m*m*p1.y + 3*m*m*lt*cp1y + 3*m*lt*lt*cp2y + lt*lt*lt*p2.y
+  };
+}
+
+// Draw tracer: broadcast style — glowing line with bright ball tip, fading tail
+function drawTracer(ctx, pts, color, thick, glowAmt, progress) {
+  if (!pts || pts.length < 2) return;
+
+  // Build dense sample points up to progress
+  const N = 300;
+  const end = Math.round(progress * N);
+  const sampled = [];
+  for (let i = 0; i <= end; i++) sampled.push(sampleSpline(pts, i/N));
+  if (sampled.length < 2) return;
+
+  // Draw fading tail — older parts dimmer
+  const tailLen = sampled.length;
+  for (let i = 1; i < tailLen; i++) {
+    const age = i / tailLen; // 0=old, 1=tip
+    const alpha = 0.15 + age * 0.8;
+    const w = thick * (0.4 + age * 0.6);
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = alpha;
+    if (glowAmt > 0 && age > 0.5) {
+      ctx.shadowBlur = glowAmt * age;
+      ctx.shadowColor = color;
+    }
+    ctx.beginPath();
+    ctx.moveTo(sampled[i-1].x, sampled[i-1].y);
+    ctx.lineTo(sampled[i].x, sampled[i].y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Bright ball tip
+  if (sampled.length > 0) {
+    const tip = sampled[sampled.length-1];
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(tip.x, tip.y, thick*1.1+1, 0, Math.PI*2);
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.95;
+    ctx.shadowBlur = glowAmt+10;
+    ctx.shadowColor = color;
+    ctx.fill();
+    ctx.restore();
+    // Colored halo
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(tip.x, tip.y, thick*1.5+3, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.25;
+    ctx.shadowBlur = glowAmt*2;
+    ctx.shadowColor = color;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function downloadBlob(blob, name='shot-trace') {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`${name}-${Date.now()}.webm`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// LIVE CAMERA
+// ══════════════════════════════════════════════════════════════════
+const liveVid=$('liveVid'), liveCanvas=$('liveCanvas');
+const liveCtx=liveCanvas.getContext('2d');
+const liveStage=$('liveStage'), liveEmpty=$('liveEmpty');
+const btnCam=$('btnCam'), btnFlip=$('btnFlip'), btnRec=$('btnRec'), btnSaveLive=$('btnSaveLive');
+const liveUndo=$('liveUndo'), liveClear=$('liveClear');
+const liveThick=$('liveThick'), liveGlowSlider=$('liveGlow');
+const livePtCount=$('livePtCount'), modeHint=$('modeHint');
+
+let lStream=null, facing='environment', camOn=false, liveRaf=null;
+let lStrokes=[], lCurrent=[], lColor='#c8f04a', lThick=5, lGlow=18;
+let lDrawMode=true; // true=draw, false=points
+let lDrawing=false;
+let lMR=null, lChunks=[], lRecording=false;
+
+function resizeLive(){
+  const r=liveStage.getBoundingClientRect();
+  liveCanvas.width=r.width; liveCanvas.height=r.height;
+}
+
+function liveLoop(){
+  if(!camOn)return;
+  liveCtx.clearRect(0,0,liveCanvas.width,liveCanvas.height);
+  liveCtx.drawImage(liveVid,0,0,liveCanvas.width,liveCanvas.height);
+  // draw all completed strokes
+  lStrokes.forEach(s=>{ if(s.pts.length>=2) drawTracer(liveCtx,s.pts,s.color,s.thick,s.glow,1); });
+  // draw current in-progress stroke
+  if(lCurrent.length>=2) drawTracer(liveCtx,lCurrent,lColor,lThick,lGlow,1);
+  liveRaf=requestAnimationFrame(liveLoop);
+}
+
+btnCam.addEventListener('click',async()=>{
+  if(camOn){stopCam();return;}
+  try{
+    lStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:1920},height:{ideal:1080}},audio:false});
+    liveVid.srcObject=lStream; liveVid.style.display='block'; liveCanvas.style.display='block';
+    liveEmpty.style.display='none';
+    liveVid.onloadedmetadata=()=>{
+      liveStage.style.aspectRatio=`${liveVid.videoWidth}/${liveVid.videoHeight}`;
+      resizeLive(); camOn=true; liveLoop();
+      setStatus('green','Live');
+      btnCam.textContent='Stop'; btnCam.className='btn btn-outline';
+      btnFlip.disabled=false; btnRec.disabled=false;
+    };
+  }catch(e){alert('Camera access denied.');}
+});
+
+function stopCam(){
+  if(lStream)lStream.getTracks().forEach(t=>t.stop());
+  cancelAnimationFrame(liveRaf); camOn=false;
+  liveVid.style.display='none'; liveCanvas.style.display='none'; liveEmpty.style.display='flex';
+  setStatus('','Idle');
+  btnCam.textContent='Start Camera'; btnCam.className='btn btn-lime';
+  btnFlip.disabled=true; btnRec.disabled=true;
+  if(lRecording)stopRec();
+}
+
+btnFlip.addEventListener('click',()=>{facing=facing==='environment'?'user':'environment';stopCam();setTimeout(()=>btnCam.click(),200);});
+
+// Draw / Points mode toggle
+$('btnDraw').addEventListener('click',()=>{
+  lDrawMode=true;
+  $('btnDraw').classList.add('on'); $('btnClick').classList.remove('on');
+  modeHint.textContent='✏ Draw mode — click and drag on the canvas to draw the ball\'s path';
+});
+$('btnClick').addEventListener('click',()=>{
+  lDrawMode=false;
+  $('btnClick').classList.add('on'); $('btnDraw').classList.remove('on');
+  modeHint.textContent='· Points mode — click each position of the ball to build the path';
+});
+
+// Canvas interaction — live
+function livePos(e){
+  const r=liveCanvas.getBoundingClientRect();
+  const src=e.touches?e.touches[0]:e;
+  return {x:(src.clientX-r.left)*(liveCanvas.width/r.width), y:(src.clientY-r.top)*(liveCanvas.height/r.height)};
+}
+
+liveCanvas.addEventListener('mousedown',e=>{
+  if(!camOn)return;
+  if(lDrawMode){ lDrawing=true; lCurrent=[livePos(e)]; }
+  else { lCurrent.push(livePos(e)); updateLiveUI(); }
+});
+liveCanvas.addEventListener('mousemove',e=>{
+  if(!camOn||!lDrawMode||!lDrawing)return;
+  lCurrent.push(livePos(e));
+});
+liveCanvas.addEventListener('mouseup',()=>{
+  if(!lDrawMode||!lDrawing)return;
+  lDrawing=false;
+  if(lCurrent.length>1){ lStrokes.push({pts:rdp(lCurrent,1.5),color:lColor,thick:lThick,glow:lGlow}); lCurrent=[]; updateLiveUI(); }
+});
+liveCanvas.addEventListener('mouseleave',()=>{ if(lDrawing&&lDrawMode){ lDrawing=false; if(lCurrent.length>1){lStrokes.push({pts:rdp(lCurrent,1.5),color:lColor,thick:lThick,glow:lGlow});lCurrent=[];updateLiveUI();}}});
+liveCanvas.addEventListener('touchstart',e=>{e.preventDefault();if(!camOn)return;if(lDrawMode){lDrawing=true;lCurrent=[livePos(e)];}else{lCurrent.push(livePos(e));updateLiveUI();}},{passive:false});
+liveCanvas.addEventListener('touchmove',e=>{e.preventDefault();if(!camOn||!lDrawMode||!lDrawing)return;lCurrent.push(livePos(e))},{passive:false});
+liveCanvas.addEventListener('touchend',()=>{if(!lDrawMode||!lDrawing)return;lDrawing=false;if(lCurrent.length>1){lStrokes.push({pts:rdp(lCurrent,1.5),color:lColor,thick:lThick,glow:lGlow});lCurrent=[];updateLiveUI();}});
+
+function updateLiveUI(){
+  const total=lStrokes.length+(lCurrent.length>0?1:0);
+  livePtCount.textContent=total;
+  liveUndo.disabled=lStrokes.length===0&&lCurrent.length===0;
+  liveClear.disabled=lStrokes.length===0&&lCurrent.length===0;
+}
+
+liveUndo.addEventListener('click',()=>{
+  if(lCurrent.length>0)lCurrent=[];
+  else lStrokes.pop();
+  updateLiveUI();
+});
+liveClear.addEventListener('click',()=>{lStrokes=[];lCurrent=[];updateLiveUI();});
+
+document.querySelectorAll('#liveCols .col').forEach(c=>{
+  c.addEventListener('click',()=>{document.querySelectorAll('#liveCols .col').forEach(x=>x.classList.remove('on'));c.classList.add('on');lColor=c.dataset.c;});
+});
+liveThick.addEventListener('input',()=>lThick=+liveThick.value);
+liveGlowSlider.addEventListener('input',()=>lGlow=+liveGlowSlider.value);
+
+// Recording
+btnRec.addEventListener('click',()=>lRecording?stopRec():startRec());
+function startRec(){
+  lChunks=[];
+  const cs=liveCanvas.captureStream(30);
+  const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+  try{lMR=new MediaRecorder(cs,{mimeType:mime});}catch(e){lMR=new MediaRecorder(cs);}
+  lMR.ondataavailable=e=>{if(e.data.size>0)lChunks.push(e.data)};
+  lMR.onstop=()=>btnSaveLive.disabled=false;
+  lMR.start(100); lRecording=true;
+  btnRec.textContent='⏹ Stop'; btnRec.className='btn btn-outline';
+  setStatus('red','Recording');
+}
+function stopRec(){
+  if(lMR&&lMR.state!=='inactive')lMR.stop();
+  lRecording=false; btnRec.textContent='⏺ Rec'; btnRec.className='btn btn-red';
+  setStatus('green','Live');
+}
+btnSaveLive.addEventListener('click',()=>{
+  if(!lChunks.length)return;
+  downloadBlob(new Blob(lChunks,{type:lChunks[0].type||'video/webm'}),'live-trace');
+});
+
+window.addEventListener('resize',resizeLive);
+
+// ══════════════════════════════════════════════════════════════════
+// UPLOAD TAB
+// ══════════════════════════════════════════════════════════════════
+const upVid=$('upVid'), upCanvas=$('upCanvas'), upCtx=upCanvas.getContext('2d');
+const upStage=$('upStage'), upEmpty=$('upEmpty');
+const scrub=$('scrub'), timeLbl=$('timeLbl');
+const upUndo=$('upUndo'), upClear=$('upClear');
+const upThick=$('upThick'), upGlowSlider=$('upGlow');
+const upPtCount=$('upPtCount'), btnRender=$('btnRender'), btnUpSave=$('btnUpSave');
+const btnAutoDetect=$('btnAutoDetect');
+const progWrap=$('progWrap'), progFill=$('progFill'), detectMsg=$('detectMsg');
+
+let upLoaded=false, upStrokes=[], upCurrent=[], upColor='#c8f04a', upLine=5, upGlowAmt=18;
+let upDrawMode=true, upDrawing=false, upPlaying=false, upRaf=null;
+let upRendered=[];
+
+function resizeUp(){
+  const r=upStage.getBoundingClientRect();
+  upCanvas.width=r.width; upCanvas.height=r.height;
+}
+
+function fmtT(t){ const m=Math.floor(t/60),s=(t%60).toFixed(1).padStart(4,'0');return`${m}:${s}`; }
+
+function upLoop(){
+  if(!upLoaded)return;
+  upCtx.clearRect(0,0,upCanvas.width,upCanvas.height);
+  upCtx.drawImage(upVid,0,0,upCanvas.width,upCanvas.height);
+  upStrokes.forEach(s=>{if(s.pts.length>=2)drawTracer(upCtx,s.pts,s.color,s.thick,s.glow,1);});
+  if(upCurrent.length>=2)drawTracer(upCtx,upCurrent,upColor,upLine,upGlowAmt,1);
+  if(!upPlaying)timeLbl.textContent=`${fmtT(upVid.currentTime)} / ${fmtT(upVid.duration||0)}`;
+  upRaf=requestAnimationFrame(upLoop);
+}
+
+$('fileIn').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  upVid.src=URL.createObjectURL(f);
+  upVid.style.display='block'; upCanvas.style.display='block'; upEmpty.style.display='none';
+  upVid.onloadedmetadata=()=>{
+    upStage.style.aspectRatio=`${upVid.videoWidth}/${upVid.videoHeight}`;
+    scrub.max=upVid.duration; scrub.step=0.033;
+    resizeUp(); upLoaded=true; upVid.currentTime=0;
+    $('scrubRow').style.display='flex';
+    $('upToolbar').style.display='flex';
+    $('upPanels').style.display='grid';
+    btnAutoDetect.disabled=false;
+    setStatus('green','Video Loaded');
+    detectMsg.textContent='';
+    upLoop();
+  };
+});
+
+// Drag & drop
+upStage.addEventListener('dragover',e=>e.preventDefault());
+upStage.addEventListener('drop',e=>{
+  e.preventDefault();
+  const f=e.dataTransfer.files[0];
+  if(f&&f.type.startsWith('video/')){$('fileIn').files=e.dataTransfer.files;$('fileIn').dispatchEvent(new Event('change'));}
+});
+
+// Scrubber
+scrub.addEventListener('input',()=>{upVid.currentTime=+scrub.value;});
+upVid.addEventListener('timeupdate',()=>{scrub.value=upVid.currentTime;timeLbl.textContent=`${fmtT(upVid.currentTime)} / ${fmtT(upVid.duration||0)}`;});
+upVid.addEventListener('ended',()=>{upPlaying=false;$('btnPP').textContent='▶';});
+$('btnPP').addEventListener('click',()=>{
+  if(upPlaying){upVid.pause();upPlaying=false;$('btnPP').textContent='▶';}
+  else{upVid.play();upPlaying=true;$('btnPP').textContent='⏸';}
+});
+$('btnBack').addEventListener('click',()=>{upVid.currentTime=Math.max(0,upVid.currentTime-1/30);});
+$('btnFwd').addEventListener('click',()=>{upVid.currentTime=Math.min(upVid.duration,upVid.currentTime+1/30);});
+
+// Draw mode toggle
+$('upBtnDraw').addEventListener('click',()=>{upDrawMode=true;$('upBtnDraw').classList.add('on');$('upBtnClick').classList.remove('on');});
+$('upBtnClick').addEventListener('click',()=>{upDrawMode=false;$('upBtnClick').classList.add('on');$('upBtnDraw').classList.remove('on');});
+
+function upPos(e){
+  const r=upCanvas.getBoundingClientRect();
+  const src=e.touches?e.touches[0]:e;
+  return {x:(src.clientX-r.left)*(upCanvas.width/r.width),y:(src.clientY-r.top)*(upCanvas.height/r.height)};
+}
+
+upCanvas.addEventListener('mousedown',e=>{
+  if(!upLoaded)return;
+  if(upDrawMode){upDrawing=true;upCurrent=[upPos(e)];}
+  else{upCurrent.push(upPos(e));updateUpUI();}
+});
+upCanvas.addEventListener('mousemove',e=>{if(!upLoaded||!upDrawMode||!upDrawing)return;upCurrent.push(upPos(e));});
+upCanvas.addEventListener('mouseup',()=>{
+  if(!upDrawMode||!upDrawing)return; upDrawing=false;
+  if(upCurrent.length>1){upStrokes.push({pts:rdp(upCurrent,1.5),color:upColor,thick:upLine,glow:upGlowAmt});upCurrent=[];updateUpUI();}
+});
+upCanvas.addEventListener('mouseleave',()=>{if(upDrawing&&upDrawMode){upDrawing=false;if(upCurrent.length>1){upStrokes.push({pts:rdp(upCurrent,1.5),color:upColor,thick:upLine,glow:upGlowAmt});upCurrent=[];updateUpUI();}}});
+upCanvas.addEventListener('touchstart',e=>{e.preventDefault();if(!upLoaded)return;if(upDrawMode){upDrawing=true;upCurrent=[upPos(e)];}else{upCurrent.push(upPos(e));updateUpUI();}},{passive:false});
+upCanvas.addEventListener('touchmove',e=>{e.preventDefault();if(!upLoaded||!upDrawMode||!upDrawing)return;upCurrent.push(upPos(e));},{passive:false});
+upCanvas.addEventListener('touchend',()=>{if(!upDrawMode||!upDrawing)return;upDrawing=false;if(upCurrent.length>1){upStrokes.push({pts:rdp(upCurrent,1.5),color:upColor,thick:upLine,glow:upGlowAmt});upCurrent=[];updateUpUI();}});
+
+function updateUpUI(){
+  const n=upStrokes.length+(upCurrent.length>0?1:0);
+  upPtCount.textContent=n;
+  upUndo.disabled=upStrokes.length===0&&upCurrent.length===0;
+  upClear.disabled=upStrokes.length===0&&upCurrent.length===0;
+  btnRender.disabled=upStrokes.length===0&&upCurrent.length<2;
+}
+upUndo.addEventListener('click',()=>{if(upCurrent.length>0)upCurrent=[];else upStrokes.pop();updateUpUI();});
+upClear.addEventListener('click',()=>{upStrokes=[];upCurrent=[];updateUpUI();detectMsg.textContent='';});
+
+document.querySelectorAll('#upCols .col').forEach(c=>{
+  c.addEventListener('click',()=>{document.querySelectorAll('#upCols .col').forEach(x=>x.classList.remove('on'));c.classList.add('on');upColor=c.dataset.c;});
+});
+upThick.addEventListener('input',()=>upLine=+upThick.value);
+upGlowSlider.addEventListener('input',()=>upGlowAmt=+upGlowSlider.value);
+
+// ── AUTO-DETECT PATH ─────────────────────────────────────────────
+// Samples frames, does frame-differencing to find moving bright spot
+btnAutoDetect.addEventListener('click', async ()=>{
+  if(!upLoaded)return;
+  btnAutoDetect.disabled=true;
+  detectMsg.textContent='Scanning video for ball movement…';
+  setStatus('blue','Detecting');
+  progWrap.style.display='block'; progFill.style.width='0%';
+
+  const dur=upVid.duration;
+  // Sample every ~0.1s
+  const interval=0.08;
+  const frames=Math.min(Math.ceil(dur/interval),120);
+  const offC=document.createElement('canvas');
+  offC.width=320; offC.height=180;
+  const offX=offC.getContext('2d');
+
+  let prevData=null;
+  const detectedPts=[];
+
+  for(let i=0;i<frames;i++){
+    const t=(i/frames)*dur;
+    await seekTo(upVid,t);
+    offX.drawImage(upVid,0,0,320,180);
+    const d=offX.getImageData(0,0,320,180).data;
+
+    if(prevData){
+      // Find pixel with largest brightness change (moving white ball)
+      let maxDelta=0, bx=0, by=0;
+      for(let y=0;y<180;y++){
+        for(let x=0;x<320;x++){
+          const idx=(y*320+x)*4;
+          const brightness=(d[idx]+d[idx+1]+d[idx+2])/3;
+          const prevBright=(prevData[idx]+prevData[idx+1]+prevData[idx+2])/3;
+          // prefer bright pixels (white ball)
+          const delta=Math.abs(brightness-prevBright)*( brightness>180?1.5:1);
+          if(delta>maxDelta){maxDelta=delta;bx=x;by=y;}
+        }
+      }
+      if(maxDelta>18){ // threshold to filter noise
+        // Scale back to canvas space
+        const sx=(bx/320)*upCanvas.width;
+        const sy=(by/180)*upCanvas.height;
+        detectedPts.push({x:sx,y:sy});
+      }
+    }
+    prevData=new Uint8ClampedArray(d);
+    progFill.style.width=`${((i+1)/frames*100).toFixed(0)}%`;
+    await new Promise(r=>setTimeout(r,0)); // yield to UI
+  }
+
+  // Reset video to start
+  upVid.currentTime=0;
+
+  if(detectedPts.length<3){
+    detectMsg.textContent='⚠ Couldn\'t find a clear path — try drawing manually.';
+    setStatus('green','Video Loaded');
+  } else {
+    // Simplify and smooth the detected points
+    const simplified=rdp(detectedPts,4);
+    upStrokes.push({pts:simplified,color:upColor,thick:upLine,glow:upGlowAmt});
+    updateUpUI();
+    detectMsg.textContent=`✓ Auto-detected ${simplified.length} points — adjust or render!`;
+    setStatus('yellow','Path Ready');
+  }
+
+  progWrap.style.display='none';
+  btnAutoDetect.disabled=false;
+});
+
+function seekTo(vid,t){
+  return new Promise(res=>{
+    vid.currentTime=t;
+    const fn=()=>{vid.removeEventListener('seeked',fn);res();};
+    vid.addEventListener('seeked',fn);
+  });
+}
+
+// ── RENDER ───────────────────────────────────────────────────────
+btnRender.addEventListener('click',async()=>{
+  const allPts=[];
+  upStrokes.forEach(s=>allPts.push(...s.pts));
+  if(allPts.length<2){alert('Draw or auto-detect a path first.');return;}
+
+  // Merge all strokes into one combined spline for the render
+  const masterStroke={pts:allPts,color:upColor,thick:upLine,glow:upGlowAmt};
+
+  btnRender.disabled=true; btnUpSave.disabled=true; upRendered=[];
+  progWrap.style.display='block'; progFill.style.width='0%';
+  detectMsg.textContent='Rendering video…';
+  setStatus('blue','Rendering');
+
+  const dur=upVid.duration;
+  const fps=30, totalFrames=Math.ceil(dur*fps);
+  const doAnim=$('chkAnim').checked, doGlow=$('chkGlow').checked;
+  const animStart=0.25, animEnd=0.80; // tracer draws on between 25%–80% of video
+
+  const offC=document.createElement('canvas');
+  offC.width=upCanvas.width; offC.height=upCanvas.height;
+  const offX=offC.getContext('2d');
+
+  const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+  const stream=offC.captureStream(fps);
+  const mr=new MediaRecorder(stream,{mimeType:mime});
+  mr.ondataavailable=e=>{if(e.data.size>0)upRendered.push(e.data);};
+  mr.onstop=()=>{
+    btnUpSave.disabled=false; btnRender.disabled=false;
+    progFill.style.width='100%';
+    detectMsg.textContent='✓ Done! Hit Save to download.';
+    setStatus('yellow','Ready to Save');
+  };
+
+  upVid.currentTime=0;
+  mr.start();
+
+  for(let f=0;f<totalFrames;f++){
+    const t=f/fps;
+    await seekTo(upVid,t);
+    offX.clearRect(0,0,offC.width,offC.height);
+    offX.drawImage(upVid,0,0,offC.width,offC.height);
+
+    let prog=1;
+    if(doAnim){
+      const pct=f/totalFrames;
+      if(pct<animStart) prog=0;
+      else if(pct>animEnd) prog=1;
+      else{
+        const raw=(pct-animStart)/(animEnd-animStart);
+        prog=raw<.5?2*raw*raw:1-Math.pow(-2*raw+2,2)/2; // ease in-out
+      }
+    }
+
+    // Draw all strokes
+    upStrokes.forEach(s=>{
+      if(s.pts.length>=2) drawTracer(offX,s.pts,s.color,s.thick,doGlow?s.glow:0,prog);
+    });
+
+    progFill.style.width=`${((f+1)/totalFrames*100).toFixed(0)}%`;
+    await new Promise(r=>setTimeout(r,0));
+  }
+
+  mr.stop();
+});
+
+btnUpSave.addEventListener('click',()=>{
+  if(!upRendered.length)return;
+  downloadBlob(new Blob(upRendered,{type:upRendered[0].type||'video/webm'}),'golf-trace');
+});
+
+window.addEventListener('resize',resizeUp);
+</script>
+</body>
+</html>
